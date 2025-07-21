@@ -40,6 +40,10 @@ class APIService:
         }
         return await self.client.make_request(endpoint, method="POST", data=data)
 
+    async def get_addresses(self):
+        endpoint = "v1/addresses"
+        return await self.client.make_request(endpoint)
+    
     async def place_order(self, shopping_list_uid, address_uid, tip=None):
         endpoint = "v3/orders"
         data = {
