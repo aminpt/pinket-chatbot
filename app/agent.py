@@ -1,128 +1,168 @@
-"""
-shopping_agent.py
-© 2025 Your Company — LangGraph ReAct Shopping Assistant
-"""
 import os
-import requests
-from typing import TypedDict, Annotated, Sequence
+from typing import Dict, List, Optional, TypedDict
 
+from dotenv import load_dotenv
 from langchain_openai import ChatOpenAI
-from langchain_core.messages import BaseMessage
 from langchain_core.runnables import RunnableConfig
 from langchain_core.tools import tool
-from langgraph.checkpoint.memory import InMemorySaver
+from langgraph.checkpoint.memory import MemorySaver
 from langgraph.prebuilt import create_react_agent
 
+from app.services.api_service import APIService
+
 # ---------------------------------------------------------------------
-# 0.  Environment -----------------------------------------------------------------
-# Expect OPENAI_API_KEY in the environment (put it in .env or your host’s secret‑store)
+# 0.  Environment
+# ---------------------------------------------------------------------
+env_path = os.path.join(os.path.dirname(__file__), "../.env")
+load_dotenv(env_path)
+
 OPENAI_API_KEY = os.getenv("OPENAI_API_KEY")
 if not OPENAI_API_KEY:
-    raise EnvironmentError("Set OPENAI_API_KEY (e.g., in .env) before running.")
-
-# ---------------------------------------------------------------------
-# 1.  Helper to build an auth header from RunnableConfig ----------------------------
-def _auth_header(cfg: RunnableConfig) -> dict[str, str]:
-    token = cfg["configurable"].get("user_token")
-    if not token:
-        raise ValueError(
-            "Missing user_token in RunnableConfig.configurable — "
-            "UI must pass the token when invoking the graph."
-        )
-    return {"Authorization": f"{token}"}
+    raise EnvironmentError("Set OPENAI_API_KEY before running.")
 
 
 # ---------------------------------------------------------------------
-# 2.  Tool definitions -------------------------------------------------
-@tool
-def search_products(query: str, cfg: RunnableConfig) -> list[dict]:
-    """Full‑text product search; returns a list of product dicts."""
-    url = f"{API_BASE_URL}/products/search"
-    resp = requests.get(url, params={"q": query}, headers=_auth_header(cfg), timeout=10)
-    resp.raise_for_status()
-    return resp.json()
+# 1.  Utilities
+# ---------------------------------------------------------------------
+def require_token(cfg: RunnableConfig) -> str:
+    """
+    Extract user_token from the RunnableConfig or raise a clear error.
+    """
+    try:
+        return cfg["configurable"]["user_token"]
+    except (KeyError, TypeError):
+        raise ValueError("user_token missing from RunnableConfig.configurable")
 
-
-@tool
-def add_to_cart(sku: str, quantity: int = 1, cfg: RunnableConfig = None) -> str:
-    """Add an item (SKU) to the current user's cart."""
-    url = f"{API_BASE_URL}/cart/items"
-    payload = {"sku": sku, "quantity": quantity}
-    resp = requests.post(url, json=payload, headers=_auth_header(cfg), timeout=10)
-    resp.raise_for_status()
-    return "added"
-
-
-@tool
-def get_cart(cfg: RunnableConfig) -> dict:
-    """Retrieve current cart contents."""
-    url = f"{API_BASE_URL}/cart"
-    resp = requests.get(url, headers=_auth_header(cfg), timeout=10)
-    resp.raise_for_status()
-    return resp.json()
-
-
-@tool
-def checkout(cfg: RunnableConfig) -> dict:
-    """Submit the order and return order confirmation."""
-    url = f"{API_BASE_URL}/cart/checkout"
-    resp = requests.post(url, headers=_auth_header(cfg), timeout=10)
-    resp.raise_for_status()
-    return resp.json()
-
-
-# List of all tools the agent may call
-TOOLS = [search_products, add_to_cart, get_cart, checkout]
 
 # ---------------------------------------------------------------------
-# 3.  Model ------------------------------------------------------------
-llm = ChatOpenAI(model="gpt-4o-mini", temperature=0)
+# 2.  Service instance
+# ---------------------------------------------------------------------
+api_service = APIService()
 
-# Instruct the model which functions it can call
-llm = llm.bind_tools(TOOLS)
 
 # ---------------------------------------------------------------------
-# 4.  Prompt -----------------------------------------------------------
+# 3.  Tool definitions
+# ---------------------------------------------------------------------
+@tool
+def global_search(query: str, cfg: RunnableConfig) -> List[Dict]:
+    """Search the entire product catalogue."""
+    token = require_token(cfg)
+    return api_service.global_search(query, token=token)
+
+
+@tool
+def get_item_view(item_id: str, branch_key: str, cfg: RunnableConfig) -> Dict:
+    """Retrieve a detailed view of an item for a branch."""
+    token = require_token(cfg)
+    return api_service.get_item_view(item_id, branch_key, token=token)
+
+
+@tool
+def get_shopping_lists(branch_key: str, cfg: RunnableConfig) -> List[Dict]:
+    """Return all shopping lists for the user in a branch."""
+    token = require_token(cfg)
+    return api_service.get_shopping_lists(branch_key, token=token)
+
+
+@tool
+def update_shopping_list(
+    shopping_list_uid: str,
+    item_uid: str,
+    branch_uid: str,
+    count: int,
+    comment: str,
+    cfg: RunnableConfig,
+) -> Dict:
+    """Add or update an item in the shopping list."""
+    token = require_token(cfg)
+    return api_service.update_shopping_list(
+        shopping_list_uid, item_uid, branch_uid, count, comment, token=token
+    )
+
+
+@tool
+def create_invoice(shopping_list_uid: str, address_uid: str, cfg: RunnableConfig) -> Dict:
+    """Create a draft invoice."""
+    token = require_token(cfg)
+    return api_service.create_invoice(shopping_list_uid, address_uid, token=token)
+
+
+@tool
+def get_addresses(cfg: RunnableConfig) -> List[Dict]:
+    """Fetch saved delivery addresses."""
+    token = require_token(cfg)
+    return api_service.get_addresses(token=token)
+
+
+@tool
+def place_order(
+    shopping_list_uid: str,
+    address_uid: str,
+    tip: Optional[float] = None,
+    cfg: RunnableConfig = None,
+) -> Dict:
+    """Finalise checkout and place an order."""
+    token = require_token(cfg)
+    return api_service.place_order(shopping_list_uid, address_uid, tip, token=token)
+
+
+TOOLS = [
+    global_search,
+    get_item_view,
+    get_shopping_lists,
+    update_shopping_list,
+    create_invoice,
+    get_addresses,
+    place_order,
+]
+
+
+# ---------------------------------------------------------------------
+# 4.  Model
+# ---------------------------------------------------------------------
+llm = ChatOpenAI(model="gpt-4.1-mini", temperature=0.4).bind_tools(TOOLS)
+
+# ---------------------------------------------------------------------
+# 5.  Prompt
+# ---------------------------------------------------------------------
 SYSTEM_PROMPT = (
-    "You are an expert shopping assistant. Use the tools provided to search "
-    "the catalogue, manage the user's cart, and complete purchases. "
-    "Always explain what you are doing and, unless the user asks otherwise, "
-    "summarise the cart before checkout."
+    "You are an expert shopping assistant. Use the tools provided to find "
+    "products, curate shopping lists, and complete purchases. "
+    "Unless told otherwise, always summarise the cart or invoice details "
+    "before placing an order."
 )
 
 # ---------------------------------------------------------------------
-# 5.  Memory / persistence --------------------------------------------
-checkpointer = InMemorySaver()
+# 6.  Memory / persistence
+# ---------------------------------------------------------------------
+checkpointer = MemorySaver()
 
 # ---------------------------------------------------------------------
-# 6.  Build the ReAct agent -------------------------------------------
+# 7.  Build the ReAct agent
+# ---------------------------------------------------------------------
+class ConfigSchema(TypedDict):
+    user_token: str
+
 shopping_agent = create_react_agent(
     model=llm,
     tools=TOOLS,
     prompt=SYSTEM_PROMPT,
-    checkpointer=checkpointer,
+    config_schema=ConfigSchema
 )
 
 # ---------------------------------------------------------------------
-# 7.  Convenience wrapper (optional) ----------------------------------
-def run_shopping_agent(user_message: str, *, thread_id: str, user_token: str):
-    """
-    Helper so the UI layer only needs to supply plain strings.
-    """
-    inputs = {"messages": [{"role": "user", "content": user_message}]}
-    cfg = {"configurable": {"thread_id": thread_id, "user_token": user_token}}
-    return shopping_agent.invoke(inputs, cfg)
-
-
+# 9.  __main__ quick test
 # ---------------------------------------------------------------------
-# 8.  __main__ block for quick manual test ----------------------------
 if __name__ == "__main__":
     import json
 
-    _token = os.getenv("TEST_USER_TOKEN", "demo‑token‑123")
-    reply = run_shopping_agent(
-        "Find me waterproof trail‑running shoes under £120 and add the top pick to my cart",
-        thread_id="demo‑session‑1",
-        user_token=_token,
-    )
-    print(json.dumps(reply, indent=2, default=str))
+    demo_token = os.getenv("USER_TOKEN_SECRET_KEY")  # real user token
+    if not demo_token:
+        raise EnvironmentError("Set USER_TOKEN_SECRET_KEY before running demo.")
+    user_message =  "گوشت برام بگیر"
+    inputs = {"messages": [{"role": "user", "content": user_message}]}
+    cfg: RunnableConfig = {
+        "configurable": {"thread_id": "demo-session-1", "user_token": demo_token}
+    }
+    reply = shopping_agent.invoke(inputs, cfg=cfg)
+    print(json.dumps(reply, indent=2, ensure_ascii=False))

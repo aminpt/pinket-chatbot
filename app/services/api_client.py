@@ -1,23 +1,47 @@
-# app/services/api_client.py
-
 import httpx
+from typing import Any, Dict, Optional
+
 
 class APIClient:
-    def __init__(self):
-        self.base_url = "https://pinket.com/api/cu"
-        self.headers = {
-            "Authorization": "Bearer <YOUR_BEARER_TOKEN>",
+    """
+    Low‑level wrapper around httpx.
+
+    It is deliberately *stateless*: headers are assembled fresh on every call,
+    so wider applications can share a single instance safely.
+    """
+
+    def __init__(self, base_url: str = "https://pinket.com/api/cu") -> None:
+        self.base_url = base_url.rstrip("/")
+
+        # These never change between requests
+        self._static_headers: Dict[str, str] = {
             "Content-Type": "application/json",
             "User-Agent": "Mozilla/5.0 (Linux; Android 6.0; Nexus 5 Build/MRA58N)",
         }
 
-    async def make_request(self, endpoint, method="GET", params=None, data=None):
-        async with httpx.AsyncClient() as client:
-            url = f"{self.base_url}/{endpoint}"
+    def make_request(
+        self,
+        endpoint: str,
+        *,
+        method: str = "GET",
+        params: Optional[Dict[str, Any]] = None,
+        data: Optional[Dict[str, Any]] = None,
+        token: str,
+        timeout: float = 10.0,
+    ):
+        """Send an HTTP request and return the decoded JSON payload."""
+        headers = {**self._static_headers, "Authorization": f"{token}"}
+        url = f"{self.base_url}/{endpoint.lstrip('/')}"
+
+        with httpx.Client(timeout=timeout) as client:
             if method == "GET":
-                response = await client.get(url, params=params, headers=self.headers)
+                resp = client.get(url, params=params, headers=headers)
             elif method == "POST":
-                response = await client.post(url, json=data, headers=self.headers)
+                resp = client.post(url, json=data, headers=headers)
             elif method == "PUT":
-                response = await client.put(url, json=data, headers=self.headers)
-            return response.json()
+                resp = client.put(url, json=data, headers=headers)
+            else:
+                raise ValueError(f"Unsupported HTTP method: {method}")
+
+        resp.raise_for_status()
+        return resp.json()
