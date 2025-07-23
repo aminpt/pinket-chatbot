@@ -30,7 +30,7 @@ class APIClient:
         timeout: float = 10.0,
     ):
         """Send an HTTP request and return the decoded JSON payload."""
-        headers = {**self._static_headers, "Authorization": f"{token}"}
+        headers = {**self._static_headers, "Authorization": f"Bearer {token}"}
         url = f"{self.base_url}/{endpoint.lstrip('/')}"
 
         with httpx.Client(timeout=timeout) as client:

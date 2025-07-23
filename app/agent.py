@@ -10,6 +10,7 @@ from langgraph.prebuilt import create_react_agent
 
 from app.services.api_service import APIService
 
+memory = MemorySaver()
 # ---------------------------------------------------------------------
 # 0.  Environment
 # ---------------------------------------------------------------------
@@ -30,9 +31,8 @@ def require_token(cfg: RunnableConfig) -> str:
     """
     try:
         return cfg["configurable"]["user_token"]
-    except (KeyError, TypeError):
-        raise ValueError("user_token missing from RunnableConfig.configurable")
-
+    except (KeyError, TypeError) as e:
+        raise e
 
 # ---------------------------------------------------------------------
 # 2.  Service instance
@@ -48,14 +48,6 @@ def global_search(query: str, cfg: RunnableConfig) -> List[Dict]:
     """Search the entire product catalogue."""
     token = require_token(cfg)
     return api_service.global_search(query, token=token)
-
-
-@tool
-def get_item_view(item_id: str, branch_key: str, cfg: RunnableConfig) -> Dict:
-    """Retrieve a detailed view of an item for a branch."""
-    token = require_token(cfg)
-    return api_service.get_item_view(item_id, branch_key, token=token)
-
 
 @tool
 def get_shopping_lists(branch_key: str, cfg: RunnableConfig) -> List[Dict]:
@@ -98,17 +90,15 @@ def get_addresses(cfg: RunnableConfig) -> List[Dict]:
 def place_order(
     shopping_list_uid: str,
     address_uid: str,
-    tip: Optional[float] = None,
-    cfg: RunnableConfig = None,
+    cfg: RunnableConfig
 ) -> Dict:
     """Finalise checkout and place an order."""
     token = require_token(cfg)
-    return api_service.place_order(shopping_list_uid, address_uid, tip, token=token)
+    return api_service.place_order(shopping_list_uid, address_uid, None, token=token)
 
 
 TOOLS = [
     global_search,
-    get_item_view,
     get_shopping_lists,
     update_shopping_list,
     create_invoice,
@@ -147,22 +137,6 @@ shopping_agent = create_react_agent(
     model=llm,
     tools=TOOLS,
     prompt=SYSTEM_PROMPT,
-    config_schema=ConfigSchema
+    config_schema=ConfigSchema,
+    checkpointer=memory
 )
-
-# ---------------------------------------------------------------------
-# 9.  __main__ quick test
-# ---------------------------------------------------------------------
-if __name__ == "__main__":
-    import json
-
-    demo_token = os.getenv("USER_TOKEN_SECRET_KEY")  # real user token
-    if not demo_token:
-        raise EnvironmentError("Set USER_TOKEN_SECRET_KEY before running demo.")
-    user_message =  "گوشت برام بگیر"
-    inputs = {"messages": [{"role": "user", "content": user_message}]}
-    cfg: RunnableConfig = {
-        "configurable": {"thread_id": "demo-session-1", "user_token": demo_token}
-    }
-    reply = shopping_agent.invoke(inputs, cfg=cfg)
-    print(json.dumps(reply, indent=2, ensure_ascii=False))
