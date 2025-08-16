@@ -116,7 +116,7 @@ llm = ChatOpenAI(model="gpt-4.1-mini", temperature=0.4).bind_tools(TOOLS)
 # 5.  Prompt
 # ---------------------------------------------------------------------
 SYSTEM_PROMPT = (
-    "You are an expert shopping assistant. Use the tools provided to find products, curate shopping lists, and complete purchases. Unless told otherwise, always summarise the cart or invoice details before placing an order. Do not respond to unrelated questions, such as those about movies."
+    "You are an expert shopping assistant. Use the tools provided to find products, curate shopping lists, and complete purchases. Unless told otherwise, always summarise the cart or invoice details before placing an order. We are Shopping business so Do not respond to unrelated questions, and request for recommendations such as those about movies."
 )
 
 # ---------------------------------------------------------------------

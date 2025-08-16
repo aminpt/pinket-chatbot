@@ -3,7 +3,7 @@ from fastapi.responses import JSONResponse
 from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
 from app.agent import shopping_agent  # Assuming agent.py is in the same directory
 from langchain.schema import AIMessage
-
+import json
 # Initialize FastAPI app
 app = FastAPI()
 
@@ -41,12 +41,26 @@ async def shopping_assistant(request: Request, user_token: str = Depends(get_tok
         }
 
         # Get the response from the agent
-        reply = shopping_agent.invoke(inputs, config=cfg)
-        print(reply)
+        # reply = shopping_agent.invoke(inputs, config=cfg)
+        res = {"payload": None}
+        reply = ""
+        for chunk in shopping_agent.stream(inputs, config=cfg, stream_mode=["updates"]):
+            print("#" * 50)
+            print(chunk)
+            if "tools" in chunk[1]:
+                data = chunk[1]["tools"]
+                if  data["messages"][0].name == "global_search":
+                    res["payload"] = json.loads(data["messages"][0].content)
+            if "agent" in chunk[1]:
+                data = chunk[1]["agent"]
+                if len(data["messages"][0].content) > 0:
+                    reply = data["messages"][0].content
+        # print(reply)
         # Return the response from the agent (usually an AIMessage or similar response format)
-        reply = {"content": reply['messages'][-1].content}
-
-        return JSONResponse(content=reply)
+        # reply = {"content": reply['messages'][-1].content}
+        # res = json.loads(res)
+        res["content"] = reply
+        return JSONResponse(content=res)
 
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
