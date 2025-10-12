@@ -15,7 +15,7 @@ class APIService:
 
     def global_search(self, query: str, *, token: str):
         return self.client.make_request(
-            f"v2/feed/global-search?q={query}", token=token
+            f"ai-assistance/items?q={query}", token=token
         )
 
     def get_item_view(self, item_id: str, branch_key: str, *, token: str):
