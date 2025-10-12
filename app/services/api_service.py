@@ -20,7 +20,7 @@ class APIService:
 
     def get_item_view(self, item_id: str, branch_key: str, *, token: str):
         return self.client.make_request(
-            f"v1/shopping-lists/item/{item_id}/view?branchKey={branch_key}",
+            f"cu/v1/shopping-lists/item/{item_id}/view?branchKey={branch_key}",
             token=token,
         )
 
@@ -28,7 +28,7 @@ class APIService:
 
     def get_shopping_lists(self, branch_key: str, *, token: str):
         return self.client.make_request(
-            f"v3/shopping-lists?branchKey={branch_key}", token=token
+            f"cu/v3/shopping-lists?branchKey={branch_key}", token=token
         )
 
     def update_shopping_list(
@@ -63,7 +63,7 @@ class APIService:
             "selectedWalletCredits": [],
         }
         return self.client.make_request(
-            f"v3/shopping-lists/{shopping_list_uid}/invoice",
+            f"cu/v3/shopping-lists/{shopping_list_uid}/invoice",
             method="POST",
             data=data,
             token=token,
@@ -88,10 +88,10 @@ class APIService:
             "selectedWalletCredits": [],
         }
         return self.client.make_request(
-            "v3/orders", method="POST", data=data, token=token
+            "cu/v3/orders", method="POST", data=data, token=token
         )
 
     # ---------- user profile ----------------------------------------------
 
     def get_addresses(self, *, token: str):
-        return self.client.make_request("v1/addresses", token=token)
+        return self.client.make_request("cu/v1/addresses", token=token)
