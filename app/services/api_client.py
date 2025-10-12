@@ -10,7 +10,7 @@ class APIClient:
     so wider applications can share a single instance safely.
     """
 
-    def __init__(self, base_url: str = "https://pinket.com/api/cu") -> None:
+    def __init__(self, base_url: str = "https://pinket.com/api") -> None:
         self.base_url = base_url.rstrip("/")
 
         # These never change between requests
