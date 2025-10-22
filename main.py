@@ -47,15 +47,22 @@ async def shopping_assistant(request: Request, user_token: str = Depends(get_tok
         for chunk in shopping_agent.stream(inputs, config=cfg, stream_mode=["updates"]):
             print("#" * 50)
             print(chunk)
-            if "error" in chunk[1]:
-                err = chunk[1]["error"]
-                if isinstance(err, dict) and err.get("status") == 401:
-                    raise HTTPException(status_code=401, detail=err.get("message", "Unauthorized"))
 
             if "tools" in chunk[1]:
-                data = chunk[1]["tools"]
-                if  data["messages"][0].name == "global_search":
-                    res["payload"] = json.loads(data["messages"][0].content)
+                tools_data = chunk[1]["tools"]
+                messages = tools_data.get("messages", [])
+                if messages:
+                    first_message = messages[0]
+                    # چک کردن اگر پیام خطای 401 هست
+                    content = getattr(first_message, "content", "")
+                    if "401" in content or "Unauthorized" in content:
+                        raise HTTPException(status_code=401, detail=content)
+                    # پردازش معمولی global_search
+                    if getattr(first_message, "name", "") == "global_search":
+                        try:
+                            res["payload"] = json.loads(content)
+                        except (json.JSONDecodeError, TypeError):
+                            res["payload"] = content
             if "agent" in chunk[1]:
                 data = chunk[1]["agent"]
                 if len(data["messages"][0].content) > 0:
