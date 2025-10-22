@@ -49,7 +49,7 @@ class APIService:
             "comment": comment,
         }
         return self.client.make_request(
-            "v3/shopping-lists", method="PUT", data=data, token=token
+            "cu/v3/shopping-lists", method="PUT", data=data, token=token
         )
 
     # ---------- checkout --------------------------------------------------
