@@ -53,10 +53,14 @@ async def shopping_assistant(request: Request, user_token: str = Depends(get_tok
                 messages = tools_data.get("messages", [])
                 if messages:
                     first_message = messages[0]
-                    # چک کردن اگر پیام خطای 401 هست
+                    status = getattr(first_message, "status", "")
                     content = getattr(first_message, "content", "")
-                    if "401" in content or "Unauthorized" in content:
+            
+                    # --------------- چک خطای 401 -----------------
+                    if status == "error" and ("401" in content or "Unauthorized" in content):
                         raise HTTPException(status_code=401, detail=content)
+                    # ---------------------------------------------
+            
                     # پردازش معمولی global_search
                     if getattr(first_message, "name", "") == "global_search":
                         try:
