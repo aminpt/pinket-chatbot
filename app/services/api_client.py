@@ -35,11 +35,11 @@ class APIClient:
 
         with httpx.Client(timeout=timeout) as client:
             if method == "GET":
-                resp = client.get(url, params=params, headers=headers)
+                resp = client.get(url, params=params, headers=headers, timeout=10000)
             elif method == "POST":
-                resp = client.post(url, json=data, headers=headers)
+                resp = client.post(url, json=data, headers=headers, timeout=10000)
             elif method == "PUT":
-                resp = client.put(url, json=data, headers=headers)
+                resp = client.put(url, json=data, headers=headers, timeout=10000)
             else:
                 raise ValueError(f"Unsupported HTTP method: {method}")
 
