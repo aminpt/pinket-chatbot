@@ -2,7 +2,9 @@ from fastapi import FastAPI, HTTPException, Request, Depends
 from fastapi.responses import JSONResponse
 from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
 from app.agent import shopping_agent  # Assuming agent.py is in the same directory
-from langchain.schema import AIMessage
+from app.agent import get_chat_history
+
+# from langchain.schema import AIMessage
 import json
 # Initialize FastAPI app
 app = FastAPI()
@@ -53,6 +55,13 @@ async def shopping_assistant(request: Request, user_token: str = Depends(get_tok
                             res["payload"] = json.loads(content)
                         except (json.JSONDecodeError, TypeError):
                             res["payload"] = content
+
+                    # Capture full payload from place_order tool
+                    if getattr(first_message, "name", "") == "place_order":
+                    try:
+                        res["payload"] = json.loads(content)
+                    except (json.JSONDecodeError, TypeError):
+                        res["payload"] = content
             
             if "agent" in chunk[1]:
                 data = chunk[1]["agent"]
@@ -60,6 +69,7 @@ async def shopping_assistant(request: Request, user_token: str = Depends(get_tok
                     reply = data["messages"][0].content
 
         res["content"] = reply
+        res["thread_id"] = thread_id
         return JSONResponse(content=res)
 
     except HTTPException as e:
@@ -69,6 +79,14 @@ async def shopping_assistant(request: Request, user_token: str = Depends(get_tok
         # Catch all other errors as 500
         raise HTTPException(status_code=500, detail=str(e))
 
+
+@app.get("/shopping-assistant/history/{thread_id}")
+async def get_history(thread_id: str, user_token: str = Depends(get_token_from_header)):
+    try:
+        history = get_chat_history(thread_id)
+        return JSONResponse(content=history)
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
 
 if __name__ == "__main__":
     import uvicorn

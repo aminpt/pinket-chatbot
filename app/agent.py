@@ -1,17 +1,19 @@
 import os
 from typing import Dict, List, Optional, TypedDict
-
 from pathlib import Path
 from dotenv import load_dotenv
+from langchain_core.messages import BaseMessage
 from langchain_openai import ChatOpenAI
 from langchain_core.runnables import RunnableConfig
 from langchain_core.tools import tool
 from langgraph.checkpoint.memory import MemorySaver
 from langgraph.prebuilt import create_react_agent
+from langgraph.checkpoint.sqlite import SqliteSaver
+import sqlite3
+
 
 from app.services.api_service import APIService
 
-memory = MemorySaver()
 # ---------------------------------------------------------------------
 # 0.  Environment
 # ---------------------------------------------------------------------
@@ -97,6 +99,45 @@ def place_order(
     token = require_token(cfg)
     return api_service.place_order(shopping_list_uid, address_uid, None, token=token)
 
+# ---------------------------------------------------------------------
+# 6.  Memory / persistence
+# ---------------------------------------------------------------------
+db_path = os.path.join(os.path.dirname(__file__), "../chat_history.db")
+conn = sqlite3.connect(db_path, check_same_thread=False)
+memory = SqliteSaver(conn)
+
+
+def get_chat_history(thread_id: str):
+
+    # memory.get() expects a RunnableConfig-like object
+    cfg = RunnableConfig(configurable={"thread_id": thread_id})
+    checkpoint = memory.get(cfg)
+
+    if checkpoint is None:
+        return {"thread_id": thread_id, "message_count": 0, "history": []}
+
+    # Compatible with both dict-like and object-like Checkpoint
+    channel_values = getattr(checkpoint, "channel_values", None)
+    if channel_values is None and isinstance(checkpoint, dict):
+        channel_values = checkpoint.get("channel_values")
+    row_messages = channel_values.get("messages", []) if channel_values else []
+    history = []
+    for msg in row_messages:
+        if isinstance(msg, BaseMessage):
+            history.append(
+                {
+                    "role": getattr(msg, "type", "unknown"),
+                    "content": msg.content,
+                }
+            )
+        else:
+            history.append(msg)
+
+    return {
+        "thread_id": thread_id,
+        "message_count": len(history),
+        "history": history
+    }
 
 TOOLS = [
     global_search,
