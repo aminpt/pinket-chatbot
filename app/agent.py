@@ -157,7 +157,7 @@ llm = ChatOpenAI(model="gpt-4.1-mini", temperature=0.4).bind_tools(TOOLS)
 # ---------------------------------------------------------------------
 # 5.  Prompt
 # ---------------------------------------------------------------------
-SYSTEM_PROMPT = Path("app\guidlines\prompt.md").read_text(encoding="utf-8")
+SYSTEM_PROMPT = Path("app/guidlines/prompt.md").read_text(encoding="utf-8")
 
 # ---------------------------------------------------------------------
 # 6.  Memory / persistence
