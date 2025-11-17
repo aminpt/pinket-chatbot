@@ -58,10 +58,10 @@ async def shopping_assistant(request: Request, user_token: str = Depends(get_tok
 
                     # Capture full payload from place_order tool
                     if getattr(first_message, "name", "") == "place_order":
-                    try:
-                        res["payload"] = json.loads(content)
-                    except (json.JSONDecodeError, TypeError):
-                        res["payload"] = content
+                        try:
+                            res["payload"] = json.loads(content)
+                        except (json.JSONDecodeError, TypeError):
+                            res["payload"] = content
             
             if "agent" in chunk[1]:
                 data = chunk[1]["agent"]
