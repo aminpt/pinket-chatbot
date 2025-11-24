@@ -139,6 +139,63 @@ def get_chat_history(thread_id: str):
         "history": history
     }
 
+
+def get_user_thread_ids(user_id: Optional[str] = None) -> List[Dict]:
+    db_path = os.path.join(os.path.dirname(__file__), "../chat_history.db")
+    conn = sqlite3.connect(db_path)
+    cursor = conn.cursor()
+
+    try:
+        if user_id:
+            cursor.execute("""
+                SELECT DISTINCT thread_id
+                FROM user_threads
+                WHERE user_id = ?
+                ORDER BY created_at DESC
+            """, (user_id,))
+        else:
+            cursor.execute("""
+                SELECT DISTINCT thread_id FROM user_threads
+                ORDER BY created_at DESC
+            """)
+
+        threads = []
+        for row in cursor.fetchall():
+            thread_id = row[0]
+            history_data = get_chat_history(thread_id)
+            threads.append({
+                "thread_id": thread_id,
+                "message_count": history_data["message_count"]            })
+        return threads
+
+    except sqlite3.Error as e:
+        print(f"Database error: {e}")
+        return []
+    finally:
+        conn.close()
+
+
+def thread_user_mapping(user_id: str, thread_id: str):
+    db_path = os.path.join(os.path.dirname(__file__), "../chat_history.db")
+    conn = sqlite3.connect(db_path)
+    cursor = conn.cursor()
+    cursor.execute("""
+        CREATE TABLE IF NOT EXISTS user_threads (
+            user_id TEXT,
+            thread_id TEXT,
+            created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+            PRIMARY KEY(user_id, thread_id)
+        )
+    """)
+    cursor.execute(
+        "INSERT OR IGNORE INTO user_threads (user_id, thread_id) VALUES (?, ?)",
+        (user_id, thread_id)
+    )
+    conn.commit()
+    conn.close()
+
+
+
 TOOLS = [
     global_search,
     get_shopping_lists,

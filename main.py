@@ -1,7 +1,8 @@
 from fastapi import FastAPI, HTTPException, Request, Depends
 from fastapi.responses import JSONResponse
 from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
-from app.agent import shopping_agent  # Assuming agent.py is in the same directory
+from app.agent import shopping_agent, get_user_thread_ids, api_service, \
+    thread_user_mapping  # Assuming agent.py is in the same directory
 from app.agent import get_chat_history
 
 # from langchain.schema import AIMessage
@@ -29,9 +30,17 @@ async def shopping_assistant(request: Request, user_token: str = Depends(get_tok
         if not user_message:
             raise HTTPException(status_code=400, detail="Message not found in request body")
 
+        user_info = api_service.get_current_user(token=user_token)
+        uid = user_info.get("uid")
         inputs = {"messages": [{"role": "user", "content": user_message}]}
-        cfg = {"configurable": {"thread_id": thread_id, "user_token": user_token}}
-
+        cfg = {
+            "configurable": {
+                "thread_id": thread_id,
+                "user_token": user_token,
+                "user_id": uid
+            }
+        }
+        thread_user_mapping(uid, thread_id)
         res = {"payload": None}
         reply = ""
 
@@ -87,6 +96,22 @@ async def get_history(thread_id: str, user_token: str = Depends(get_token_from_h
         return JSONResponse(content=history)
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
+
+@app.get("/shopping-assistant/threads")
+async def get_threads(user_token: str = Depends(get_token_from_header)):
+    """
+    Get all thread IDs for the authenticated user.
+    """
+    try:
+        user_info = api_service.get_current_user(token=user_token)
+        user_id = user_info.get("uid")
+
+        threads = get_user_thread_ids(user_id=user_id)
+
+        return JSONResponse(content={"threads": threads, "total": len(threads)})
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
 
 if __name__ == "__main__":
     import uvicorn
