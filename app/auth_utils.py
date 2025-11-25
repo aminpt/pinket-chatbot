@@ -3,7 +3,7 @@ from jwt import PyJWKClient
 from fastapi import HTTPException
 from typing import Any, Dict
 
-JWKS_URL = "https://test.pinket.com/auth-server/.well-known/jwks.json"
+JWKS_URL = "https://pinket.com/auth-server/.well-known/jwks.json"
 ALLOWED_ALGS = ["RS256", "RS512", "HS256"]
 
 
