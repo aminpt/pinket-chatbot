@@ -96,6 +96,3 @@ class APIService:
     def get_addresses(self, *, token: str):
         return self.client.make_request("cu/v1/addresses", token=token)
 
-    def get_current_user(self, *, token: str):
-        """Fetch current user data from Vishop using JWT"""
-        return self.client.make_request("user", token=token)
