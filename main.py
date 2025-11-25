@@ -1,3 +1,5 @@
+import uuid
+
 from fastapi import FastAPI, HTTPException, Request, Depends
 from fastapi.responses import JSONResponse
 from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
@@ -25,8 +27,7 @@ async def shopping_assistant(request: Request, user_token: str = Depends(get_tok
     try:
         body = await request.json()
         user_message = body.get("message")
-        thread_id = body.get("thread_id", user_token)
-
+        thread_id = body.get("thread_id") or str(uuid.uuid4())
         if not user_message:
             raise HTTPException(status_code=400, detail="Message not found in request body")
 
